@@ -1,0 +1,17 @@
+*.local.js
+ayarlarim.js
+tcdd-bilet-bulucu/
+config.py
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+
+*.log
