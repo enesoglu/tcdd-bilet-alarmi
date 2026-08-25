@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TCDD Bilet Alarmı
 // @namespace    https://github.com/
-// @version      1.3.0
+// @version      1.3.2
 // @description  TCDD e-bilet sitesinde boş koltuk çıkınca sesli ve görsel alarm verir, bulunan seferin üzerine götürür.
 // @author       Enes Yıldız
 // @license      MIT
@@ -225,7 +225,17 @@
       "#bb-panel .bb-gun:hover{border-color:#8d99a6;background:#22303d}" +
       "#bb-panel .bb-gun.bugun{border-color:#8d99a6}" +
       `#bb-panel .bb-gun.secili{background:${RENK.yesil};border-color:${RENK.yesil};color:#fff}` +
-      "#bb-panel input[type=checkbox]{accent-color:" + RENK.yesil + "}";
+      "#bb-panel input[type=checkbox]{accent-color:" + RENK.yesil + "}" +
+      "#bb-panel .bb-sefer-kutu{height:300px}" +
+      // Dar ekranlarda tek sütuna düş
+      "@media (max-width:840px){#bb-panel .bb-sutunlar{flex-direction:column;gap:0}" +
+      "#bb-panel .bb-sutunlar>div{flex:1 1 auto;width:100%}" +
+      "#bb-panel .bb-sefer-kutu{height:220px}}" +
+      // Alçak ekranlarda sefer listesi ve takvim kısalsın
+      "@media (max-height:820px){#bb-panel .bb-sefer-kutu{height:240px}" +
+      "#bb-panel .bb-gun{aspect-ratio:auto;height:30px}}" +
+      "@media (max-height:700px){#bb-panel .bb-sefer-kutu{height:190px}" +
+      "#bb-panel .bb-gun{height:26px;font-size:13px}}";
     document.head.appendChild(s);
   }
 
@@ -519,10 +529,12 @@
       "justify-content:center;padding:24px;overflow:auto;");
     k.id = "bb-panel";
 
-    const kutu = el("div", "width:100%;max-width:460px;background:#243140;border-radius:14px;padding:30px;box-shadow:0 12px 40px rgba(0,0,0,.5);");
+    const kutu = el("div",
+      "width:100%;max-width:900px;max-height:calc(100vh - 48px);overflow:auto;background:#243140;" +
+      "border-radius:14px;padding:26px 30px;box-shadow:0 12px 40px rgba(0,0,0,.5);");
     kutu.append(
-      el("div", "font:700 23px system-ui;margin-bottom:4px;text-align:center;", "🚄 TCDD Bilet Alarmı"),
-      el("div", "font:400 14px system-ui;color:#8d99a6;margin-bottom:24px;text-align:center;", "Boş koltuk çıktığında sizi uyarır")
+      el("div", "font:700 22px system-ui;margin-bottom:3px;text-align:center;", "🚄 TCDD Bilet Alarmı"),
+      el("div", "font:400 13.5px system-ui;color:#8d99a6;margin-bottom:18px;text-align:center;", "Boş koltuk çıktığında sizi uyarır")
     );
 
     // Takip sürüyorsa durum çubuğu göster; ayarlar değiştirilip yeniden başlatılabilir
@@ -569,6 +581,7 @@
 
     /* ---- Takvim: hangi günler izlensin ---- */
     const secilenGunler = new Set(tarihFiltresiCozumle(AYAR.saatFiltresi));
+    const secilenSeferler = new Set(saatFiltresiCozumle(AYAR.saatFiltresi));
     const takvimBaslik = el("label", null, "Hangi günler izlensin?");
     const takvim = el("div", "display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:6px;");
     const gunEtiketleri = el("div", "display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:6px;");
@@ -595,7 +608,11 @@
       h.onclick = () => {
         if (secilenGunler.has(anahtar)) secilenGunler.delete(anahtar); else secilenGunler.add(anahtar);
         h.classList.toggle("secili");
-        seferleriTazele();
+        seferleriTazele().catch(e => {
+          console.error("Sefer listesi yüklenemedi:", e);
+          seferKutu.textContent = "";
+          seferKutu.appendChild(el("div", "color:#e74c3c;font:400 13px system-ui;", "Sefer listesi yüklenemedi: " + e.message));
+        });
       };
       gunHucreleri.set(anahtar, h);
       takvim.appendChild(h);
@@ -607,18 +624,17 @@
     /* ---- Sefer seçimi: seçilen günlerin gerçek seferleri ---- */
     const seferBaslik = el("label", null, "Hangi seferler izlensin?");
     const seferKutu = el("div",
-      "margin-top:6px;max-height:190px;overflow:auto;background:#1b242e;border:1px solid #56626e;" +
+      "margin-top:6px;overflow:auto;background:#1b242e;border:1px solid #56626e;" +
       "border-radius:8px;padding:10px;");
+    seferKutu.className = "bb-sefer-kutu";   // yükseklik CSS'ten (ekran boyuna göre)
     seferBaslik.appendChild(seferKutu);
 
-    const secilenSeferler = new Set(saatFiltresiCozumle(AYAR.saatFiltresi));
     let seferTazeleNo = 0;
 
     async function seferleriTazele() {
       const benimNo = ++seferTazeleNo;
       const gunler = [...secilenGunler].sort();
-      seferKutu.children.length = 0;
-      seferKutu.textContent = "";
+      seferKutu.textContent = "";       // içeriği temizler (children salt okunurdur)
 
       if (!binis.i.value.trim() || !inis.i.value.trim()) {
         seferKutu.appendChild(el("div", "color:#6d7a87;font:400 13px system-ui;", "Önce istasyonları girin."));
@@ -771,7 +787,20 @@
       dongu();
     };
 
-    kutu.append(binis.l, inis.l, takvimBaslik, takvimNot, seferBaslik, satir, onayKutu, uyari, btn, iptal, not);
+    /* İki sütunlu yerleşim: solda rota ve takvim, sağda sefer listesi */
+    const sutunlar = el("div", "display:flex;gap:26px;align-items:flex-start;");
+    sutunlar.className = "bb-sutunlar";
+    const sol = el("div", "flex:1 1 380px;min-width:0;");
+    const sag = el("div", "flex:1 1 400px;min-width:0;display:flex;flex-direction:column;");
+
+    const rotaSatiri = el("div", null); rotaSatiri.className = "satir";
+    rotaSatiri.append(binis.l, inis.l);
+
+    sol.append(rotaSatiri, takvimBaslik, takvimNot);
+    sag.append(seferBaslik, satir, onayKutu);
+    sutunlar.append(sol, sag);
+
+    kutu.append(sutunlar, uyari, btn, iptal, not);
     k.appendChild(kutu);
     document.body.appendChild(k);
 

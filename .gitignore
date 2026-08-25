@@ -1,5 +1,9 @@
 *.local.js
 ayarlarim.js
+
+# Gelistirme sirasinda kullanilan gecici test dosyalari
+katistub.js
+test5.js
 tcdd-bilet-bulucu/
 config.py
 __pycache__/
