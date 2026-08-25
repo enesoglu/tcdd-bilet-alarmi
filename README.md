@@ -12,6 +12,7 @@ TCDD e-bilet sisteminde dolu görünen seferleri düzenli aralıklarla kontrol e
   - **Masaüstü bildirimi** — tarayıcı küçültülmüş olsa dahi görünür, kapatılana kadar ekranda kalır
   - **Tam ekran uyarı** — tren adı, kalkış saati, koltuk sayısı ve en düşük fiyat bilgisiyle
 - **Bu sefere git** düğmesi, sefer listesinde ilgili günü açar, treni bulup işaretler
+- Takvimden gün seçilir, o günün gerçek sefer listesinden izlenecek seferler işaretlenir
 - Kalkış saati geçmiş seferleri listelemez
 - Engelli koltukları varsayılan olarak hariç tutulur, isteğe bağlı dahil edilebilir
 - Aynı sefer için tekrarlı uyarıları sınırlar (varsayılan: 10 dakika)
@@ -58,12 +59,24 @@ Ayarlar panelden yapılır ve tarayıcıda saklanır. Kod düzenlemesi gerekmez.
 |---|---|---|
 | Kalkış istasyonu | Otomatik tamamlamalı istasyon listesinden seçilir | GEBZE |
 | Varış istasyonu | Otomatik tamamlamalı istasyon listesinden seçilir | ANKARA GAR |
-| Kaç gün taransın | 1 = bugün, 2 = bugün ve yarın | 2 |
+| Günler | Takvimden tıklanarak seçilir; seçim yapılmazsa bugün ve yarın izlenir | boş |
+| Seferler | Seçilen günlerin gerçek sefer listesinden işaretlenir | boş |
 | Kontrol aralığı | Saniye cinsinden; en düşük 30 | 60 |
-| Saat filtresi | `08:00, 12:40` biçiminde; boş bırakılırsa tüm saatler | boş |
 | Engelli koltukları | Tekerlekli sandalye koltuklarının bildirilip bildirilmeyeceği | kapalı |
 
 Varsayılan değerler dosyanın başındaki `VARSAYILAN` bloğundan değiştirilebilir. Bu değerler yalnızca kayıtlı ayar bulunmadığında kullanılır.
+
+### Gün ve sefer seçimi
+
+Panelde bugünden itibaren 30 günlük bir takvim bulunur. İzlenmek istenen günlere tıklandığında, o günlerin **gerçek sefer listesi** doğrudan panelde görüntülenir; her seferin saati, tren numarası ve o anki boş koltuk durumu listelenir.
+
+- Yalnızca belirli seferler işaretlenirse **sadece o seferler** izlenir
+- Bir gün seçilip hiçbir seferi işaretlenmezse **o günün tamamı** izlenir
+- Hiç gün seçilmezse bugün ve yarının tüm seferleri izlenir
+
+Taranacak gün sayısı seçime göre otomatik ayarlanır; ayrıca belirtmek gerekmez.
+
+Örneğin 26 Ağustos'un 17:25 ve 18:30 seferleri işaretlenirse yalnızca bu iki sefer için alarm çalar, aynı günün diğer seferleri için çalmaz.
 
 ---
 
