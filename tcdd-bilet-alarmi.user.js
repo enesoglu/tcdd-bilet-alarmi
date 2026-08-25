@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         TCDD Bilet Alarmı
 // @namespace    https://github.com/
-// @version      1.3.2
+// @version      1.4.0
 // @description  TCDD e-bilet sitesinde boş koltuk çıkınca sesli ve görsel alarm verir, bulunan seferin üzerine götürür.
 // @author       Enes Yıldız
 // @license      MIT
@@ -42,13 +42,25 @@
     //   "26.08"                 yalnızca o tarih (tüm saatler)
     //   "26.08 17:00-23:59"     o tarihte, o saat aralığında
     saatFiltresi: "",
-    engelliKoltukDahil: false,   // Tekerlekli sandalye koltukları da bildirilsin mi
+    // İzlenecek koltuk sınıfları. Kodlar KABIN_SINIFLARI listesinde.
+    // Varsayılan: yalnızca ekonomi. Boş dizi = tüm sınıflar.
+    siniflar: ["Y1"],
     aralikSn: 60,                // Kontroller arası bekleme (saniye)
     tekrarBildirimSn: 600,       // Aynı tren için tekrar uyarı aralığı (saniye)
   };
 
   const AYAR_ANAHTARI = "tcddBiletAlarmiAyarlar";
   const EN_KISA_ARALIK = 30;     // Sunucuya yük bindirmemek için alt sınır
+
+  /* TCDD kabin sınıfları (API'den doğrulanmış kodlar).
+     Bilinmeyen bir kod gelirse yine de listelenir, seçilebilir olur. */
+  const KABIN_SINIFLARI = [
+    { kod: "Y1",  ad: "Ekonomi" },
+    { kod: "C",   ad: "Business" },
+    { kod: "L",   ad: "Loca" },
+    { kod: "B",   ad: "Yataklı" },
+    { kod: "DSB", ad: "Tekerlekli sandalye" },
+  ];
 
   /* =============================================================== */
 
@@ -218,7 +230,6 @@
       "background:#1b242e;color:#fff;font:400 15px system-ui}" +
       "#bb-panel label{display:block;margin-bottom:13px;font:600 13px system-ui;color:#b9c3cd;text-align:left}" +
       "#bb-panel .satir{display:flex;gap:14px}#bb-panel .satir>*{flex:1}" +
-      "#bb-panel .onay{display:flex;align-items:center;gap:9px;margin-bottom:15px;color:#b9c3cd;font:600 13px system-ui}" +
       // Takvim hücreleri
       "#bb-panel .bb-gun{aspect-ratio:1;border:1px solid #56626e;border-radius:7px;background:#1b242e;" +
       "color:#dfe6ec;font:600 14px system-ui;cursor:pointer;padding:0;transition:.12s}" +
@@ -226,6 +237,12 @@
       "#bb-panel .bb-gun.bugun{border-color:#8d99a6}" +
       `#bb-panel .bb-gun.secili{background:${RENK.yesil};border-color:${RENK.yesil};color:#fff}` +
       "#bb-panel input[type=checkbox]{accent-color:" + RENK.yesil + "}" +
+      // Koltuk sınıfı etiketleri
+      "#bb-panel .bb-sinif{display:inline-flex;align-items:center;gap:6px;margin:0;padding:7px 12px;" +
+      "border:1px solid #56626e;border-radius:20px;background:#1b242e;color:#b9c3cd;" +
+      "font:600 12.5px system-ui;cursor:pointer;transition:.12s;white-space:nowrap}" +
+      "#bb-panel .bb-sinif:hover{border-color:#8d99a6}" +
+      `#bb-panel .bb-sinif.secili{border-color:${RENK.yesil};background:#1d3b2a;color:#fff}` +
       "#bb-panel .bb-sefer-kutu{height:300px}" +
       // Dar ekranlarda tek sütuna düş
       "@media (max-width:840px){#bb-panel .bb-sutunlar{flex-direction:column;gap:0}" +
@@ -353,7 +370,7 @@
 
   /* Belirli bir gün için sefer listesi (panelde seçim yapmak üzere).
      gun: "26.08" · dönen: [{saat, no, tip, bos}] */
-  async function seferleriGetir(ist, gun) {
+  async function seferleriGetir(ist, gun, sinifSecimi) {
     const token = localStorage.getItem("AUTH_TOKEN");
     if (!token) throw new Error("Oturum anahtarı bulunamadı. Sayfayı yenileyin.");
     const [gg, aa] = gun.split(".").map(Number);
@@ -388,7 +405,7 @@
           if (!seg) continue;
           const kalkis = zaman(seg.departureTime);
           if (kalkis.getTime() < simdi) continue;
-          const { toplam } = koltukSay(t);
+          const { toplam } = koltukSay(t, sinifSecimi);
           cikti.push({ saat: saatMetni(kalkis), no: t.number, tip: t.type || "", bos: toplam });
         }
     return cikti.sort((a, b) => a.saat.localeCompare(b.saat));
@@ -401,12 +418,15 @@
     return `${p(d.getDate())}-${p(d.getMonth() + 1)}-${d.getFullYear()} 00:00:00`;
   }
 
-  function koltukSay(tren) {
+  /* Seçili sınıfların boş koltuklarını sayar.
+     AYAR.siniflar boşsa tüm sınıflar dahil edilir. */
+  function koltukSay(tren, sinifSecimi) {
+    const secili = sinifSecimi || AYAR.siniflar || [];
     const sinif = {}; let enUcuz = null;
     for (const f of tren.availableFareInfo || [])
       for (const cc of f.cabinClasses || []) {
         const kod = cc.cabinClass?.code, ad = cc.cabinClass?.name || kod;
-        if (kod === "DSB" && !AYAR.engelliKoltukDahil) continue;   // tekerlekli sandalye
+        if (secili.length && !secili.includes(kod)) continue;
         sinif[ad] = Math.max(sinif[ad] ?? 0, cc.availabilityCount || 0);
         for (const b of cc.bookingClassAvailabilities || [])
           if ((b.availability || 0) > 0 && b.price && (enUcuz === null || b.price < enUcuz)) enUcuz = b.price;
@@ -580,8 +600,12 @@
     const aralik = alan("Kontrol aralığı (sn)", "number", AYAR.aralikSn, { min: EN_KISA_ARALIK, max: 3600 });
 
     /* ---- Takvim: hangi günler izlensin ---- */
+    // Bu üç küme seferleriTazele() tarafından kullanılır; tanımları
+    // fonksiyon çağrılarından ÖNCE olmalı (temporal dead zone).
     const secilenGunler = new Set(tarihFiltresiCozumle(AYAR.saatFiltresi));
     const secilenSeferler = new Set(saatFiltresiCozumle(AYAR.saatFiltresi));
+    const secilenSiniflar = new Set(
+      Array.isArray(AYAR.siniflar) && AYAR.siniflar.length ? AYAR.siniflar : VARSAYILAN.siniflar);
     const takvimBaslik = el("label", null, "Hangi günler izlensin?");
     const takvim = el("div", "display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:6px;");
     const gunEtiketleri = el("div", "display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:6px;");
@@ -660,7 +684,7 @@
       const hepsi = [];
       for (const g of gunler) {
         try {
-          const list = await seferleriGetir(ist, g);
+          const list = await seferleriGetir(ist, g, [...secilenSiniflar]);
           list.forEach(s => hepsi.push({ ...s, gun: g }));
         } catch (e) { /* o gün için sefer yok veya hata; sessizce geç */ }
       }
@@ -708,13 +732,27 @@
     const satir = el("div", null); satir.className = "satir";
     satir.append(aralik.l);
 
-    const onayKutu = el("div", null); onayKutu.className = "onay";
-    const onay = document.createElement("input");
-    onay.type = "checkbox"; onay.checked = !!AYAR.engelliKoltukDahil; onay.id = "bb-dsb";
-    onay.style.cssText = "width:17px;height:17px;cursor:pointer";
-    const onayEtiket = el("label", "margin:0;cursor:pointer;color:#b9c3cd;font:600 13px system-ui", "Engelli koltukları da bildirilsin");
-    onayEtiket.setAttribute("for", "bb-dsb");
-    onayKutu.append(onay, onayEtiket);
+    /* ---- Koltuk sınıfı seçimi ---- */
+    const sinifBaslik = el("label", null, "Hangi koltuk sınıfları?");
+    const sinifKutu = el("div", "display:flex;flex-wrap:wrap;gap:7px;margin-top:6px;margin-bottom:14px;");
+
+    for (const s of KABIN_SINIFLARI) {
+      const et = el("label", null);
+      et.className = "bb-sinif";
+      if (secilenSiniflar.has(s.kod)) et.classList.add("secili");
+      const c = document.createElement("input");
+      c.type = "checkbox"; c.checked = secilenSiniflar.has(s.kod);
+      c.style.cssText = "width:15px;height:15px;cursor:pointer;margin:0";
+      c.onchange = () => {
+        if (c.checked) secilenSiniflar.add(s.kod); else secilenSiniflar.delete(s.kod);
+        et.classList.toggle("secili", c.checked);
+        seferleriTazele().catch(() => {});
+      };
+      et.append(c, el("span", null, s.ad));
+      sinifKutu.appendChild(et);
+    }
+    sinifBaslik.appendChild(sinifKutu);
+    const onayKutu = sinifBaslik;
 
     const uyari = el("div", "min-height:20px;color:#e74c3c;font:600 13px system-ui;margin-bottom:10px;text-align:center;");
 
@@ -744,8 +782,9 @@
         gunSayisi: gerekenGunSayisi(secilenGunler),
         aralikSn: Math.max(EN_KISA_ARALIK, parseInt(aralik.i.value, 10) || VARSAYILAN.aralikSn),
         saatFiltresi: filtre,
-        engelliKoltukDahil: onay.checked,
+        siniflar: [...secilenSiniflar],
       };
+      if (!yeni.siniflar.length) { uyari.textContent = "En az bir koltuk sınıfı seçin."; return; }
       if (!yeni.binis || !yeni.inis) { uyari.textContent = "Kalkış ve varış istasyonlarını girin."; return; }
       if (esit(yeni.binis, yeni.inis)) { uyari.textContent = "Kalkış ve varış istasyonu aynı olamaz."; return; }
 

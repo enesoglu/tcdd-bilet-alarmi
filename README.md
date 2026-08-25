@@ -14,7 +14,7 @@ TCDD e-bilet sisteminde dolu görünen seferleri düzenli aralıklarla kontrol e
 - **Bu sefere git** düğmesi, sefer listesinde ilgili günü açar, treni bulup işaretler
 - Takvimden gün seçilir, o günün gerçek sefer listesinden izlenecek seferler işaretlenir
 - Kalkış saati geçmiş seferleri listelemez
-- Engelli koltukları varsayılan olarak hariç tutulur, isteğe bağlı dahil edilebilir
+- Koltuk sınıfı seçilebilir: ekonomi, business, loca, yataklı, tekerlekli sandalye
 - Aynı sefer için tekrarlı uyarıları sınırlar (varsayılan: 10 dakika)
 - Ayarlar arayüzden yapılır ve tarayıcıda saklanır; kod düzenlemeye gerek yoktur
 
@@ -61,8 +61,8 @@ Ayarlar panelden yapılır ve tarayıcıda saklanır. Kod düzenlemesi gerekmez.
 | Varış istasyonu | Otomatik tamamlamalı istasyon listesinden seçilir | ANKARA GAR |
 | Günler | Takvimden tıklanarak seçilir; seçim yapılmazsa bugün ve yarın izlenir | boş |
 | Seferler | Seçilen günlerin gerçek sefer listesinden işaretlenir | boş |
+| Koltuk sınıfları | İzlenecek sınıflar; en az biri seçilmelidir | Ekonomi |
 | Kontrol aralığı | Saniye cinsinden; en düşük 30 | 60 |
-| Engelli koltukları | Tekerlekli sandalye koltuklarının bildirilip bildirilmeyeceği | kapalı |
 
 Varsayılan değerler dosyanın başındaki `VARSAYILAN` bloğundan değiştirilebilir. Bu değerler yalnızca kayıtlı ayar bulunmadığında kullanılır.
 
@@ -75,6 +75,20 @@ Panelde bugünden itibaren 30 günlük bir takvim bulunur. İzlenmek istenen gü
 - Hiç gün seçilmezse bugün ve yarının tüm seferleri izlenir
 
 Taranacak gün sayısı seçime göre otomatik ayarlanır; ayrıca belirtmek gerekmez.
+
+### Koltuk sınıfları
+
+Varsayılan olarak yalnızca **ekonomi** izlenir. Business, Loca, Yataklı veya Tekerlekli sandalye sınıflarını da izlemek isterseniz panelden işaretleyebilirsiniz.
+
+| Sınıf | Açıklama |
+|---|---|
+| Ekonomi | Standart YHT koltuğu (varsayılan) |
+| Business | Geniş koltuklu üst sınıf |
+| Loca | Dört kişilik kapalı bölme |
+| Yataklı | Ana hat gece trenlerinde yataklı kompartıman |
+| Tekerlekli sandalye | Engelli yolcular için ayrılmış yerler |
+
+Sefer listesindeki boş koltuk sayıları da yalnızca seçili sınıfları yansıtır. Örneğin yalnızca ekonomi seçiliyken business'ta yer olan bir sefer "dolu" görünür ve alarm çalmaz.
 
 Örneğin 26 Ağustos'un 17:25 ve 18:30 seferleri işaretlenirse yalnızca bu iki sefer için alarm çalar, aynı günün diğer seferleri için çalmaz.
 
